@@ -15,24 +15,20 @@
         "description": "Admin password for the VM."
       }
     },
-    "deploymentTimestamp": {
-      "type": "string",
-      "defaultValue": "[utcNow()]",
-      "metadata": {
-        "description": "Timestamp to ensure unique resources."
-      }
-    }
+    "DeploymentID": {
+     "type": "String"
+    } 
   },
   "variables": {
     "vnetName": "myVNet",
     "subnetName": "mySubnet",
     "vmName": "WinServerVM",
     "ipName": "mypublicip",
-    "publicIPDomainLabel": "[toLower(concat('dns', uniqueString(resourceGroup().id, parameters('deploymentTimestamp'))))]",
+    "publicIPDomainLabel": "[concat('dns' , parameters('DeploymentID'), 'vm' , uniqueString(resourceGroup().id))]",
     "nicName": "mynic",
     "vmSize": "Standard_B2s",
     "osDiskName": "vm-os-disk",
-    "storageAccountName": "mystorageacct2024",
+    "storageAccountName": "[concat('strg',parameters('DeploymentID'))]",
     "location": "[resourceGroup().location]",
     "containerName": "myblobcontainer"
   },
@@ -204,7 +200,7 @@
     },
     "publicDNS": {
     "type": "string",
-    "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', variables('ipName')), '2024-03-01').dnsSettings.fqdn]"
+    "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', variables('ipName'))).dnsSettings.fqdn]"
   },
      "containerurl": {
     "type": "string",
