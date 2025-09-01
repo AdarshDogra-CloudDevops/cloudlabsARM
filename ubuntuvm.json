@@ -1,0 +1,214 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminUsername": {
+      "type": "string",
+      "defaultValue": "azureadmin",
+      "metadata": {
+        "description": "Admin username for the VM."
+      }
+    },
+    "adminPassword": {
+      "type": "secureString",
+      "metadata": {
+        "description": "Admin password for the VM."
+      }
+    },
+    "DeploymentID": {
+     "type": "String"
+    } 
+  },
+  "variables": {
+    "vmName": "[concat('ubuntu', parameters('DeploymentID'))]",
+    "vnetName": "[concat('vnet-',variables('vmName'))]",
+    "subnetName": "[concat('subnet-',variables('vmName'))]",  
+    "nsgName": "[concat('nsg-',variables('vmName'))]",
+    "ipName": "[concat('pip-',variables('vmName'))]",
+    "publicIPDomainLabel": "[toLower(concat(variables('vmName') , uniqueString(resourceGroup().id)))]",
+    "nicName": "[concat('nic-',variables('vmName'))]", 
+    "osDiskName": "[concat('osdisk-',variables('vmName'))]",   
+    "storageAccountName": "[toLower(concat('strg',variables('vmName')))]",
+    "containerName": "[toLower(concat('blobcontainer',variables('vmName')))]",
+    "location": "[resourceGroup().location]",
+    "vmSize": "Standard_D2s_v3"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2022-07-01",
+      "name": "[variables('vnetName')]",
+      "location": "[variables('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "10.0.0.0/16"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('subnetName')]",
+            "properties": {
+              "addressPrefix": "10.0.0.0/24"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2022-07-01",
+      "name": "[variables('ipName')]",
+      "location": "[variables('location')]",
+      "sku": {
+        "name": "Standard"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "Static",
+        "dnsSettings": {
+                  "domainNameLabel": "[variables('publicIPDomainLabel')]"  
+            }  
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2022-07-01",
+      "name": "[variables('nsgName')]",
+      "location": "[variables('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow-ssh",
+            "properties": {
+              "priority": 1000,
+              "access": "Allow",
+              "direction": "Inbound",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "22",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2022-07-01",
+      "name": "[variables('nicName')]",
+      "location": "[variables('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/publicIPAddresses', variables('ipName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]",
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('ipName'))]"
+              },
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), variables('subnetName'))]"
+              }
+            }
+          }
+        ],
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-01-01",
+      "name": "[variables('storageAccountName')]",
+      "location": "[variables('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+      "allowBlobPublicAccess": true
+      }
+      },
+    {
+        "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+        "apiVersion": "2023-01-01",
+        "name":  "[format('{0}/default/{1}', variables('storageAccountName'), variables('containerName'))]",
+        "dependsOn": [
+            "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+        ],
+        "properties": {
+        "publicAccess": "Blob"
+        }
+    },
+ {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2024-07-01",
+      "name": "[variables('vmName')]",
+      "location": "[variables('location')]",
+      "dependsOn": [
+            "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+            ],
+      "properties": {
+        "hardwareProfile": {
+        "vmSize": "[variables('vmSize')]"
+         },
+        "osProfile": {
+        "computerName": "[variables('vmName')]",
+            "adminUsername": "[parameters('adminUsername')]",
+            "adminPassword": "[parameters('adminPassword')]",
+            "linuxConfiguration": {
+            "disablePasswordAuthentication": false    
+                 }
+            },
+            "storageProfile": {
+            "imageReference": {
+            "publisher": "Canonical",
+            "offer": "0001-com-ubuntu-server-jammy",
+            "sku": "22_04-lts-gen2",
+            "version": "latest"
+                    },
+            "osDisk": {
+                 "createOption": "fromImage",
+                 "name": "[variables('osDiskName')]"
+                    }
+                },
+            "networkProfile": {
+                "networkInterfaces": [
+                     {
+                        "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+                    }
+                    ]
+                }
+            }
+        }
+  ],
+  "outputs": {
+    "adminUsername": {
+      "type": "string",
+      "value": "[parameters('adminUsername')]"
+    },
+    "adminPassword": {
+      "type": "String",
+      "value": "[parameters('adminPassword')]"
+    },
+    "publicIPAddress": {
+      "type": "string",
+      "value": "[reference(variables('ipName')).ipAddress]"
+    },
+    "publicDNS": {
+    "type": "string",
+    "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', variables('ipName'))).dnsSettings.fqdn]"
+  },
+     "containerurl": {
+    "type": "string",
+    "value": "[format('https://{0}.blob.core.windows.net/{1}', variables('storageAccountName'), variables('containerName'))]"
+   }
+  }
+}
