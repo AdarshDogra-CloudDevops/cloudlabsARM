@@ -20,17 +20,18 @@
     } 
   },
   "variables": {
-    "vnetName": "myVNet",
-    "subnetName": "mySubnet",
-    "vmName": "WinServerVM",
-    "ipName": "mypublicip",
-    "publicIPDomainLabel": "[concat('dns' , parameters('DeploymentID'), 'vm' , uniqueString(resourceGroup().id))]",
-    "nicName": "mynic",
-    "vmSize": "Standard_B2s",
-    "osDiskName": "vm-os-disk",
-    "storageAccountName": "[concat('strg',parameters('DeploymentID'))]",
+    "vmName": "winservervm",
+    "vnetName": "[concat(variables('vmName'), '-vnet-', parameters('DeploymentID'))]",
+    "subnetName": "[concat(variables('vmName'), '-subnet-', parameters('DeploymentID'))]",  
+    "nsgName": "[concat(variables('vmName'), '-nsg-', parameters('DeploymentID'))]",
+    "ipName": "[concat(variables('vmName'), '-pip-', parameters('DeploymentID'))]",
+    "publicIPDomainLabel": "[toLower(concat(variables('vmName') , parameters('DeploymentID'), uniqueString(resourceGroup().id)))]",
+    "nicName": "[concat(variables('vmName'), '-nic-', parameters('DeploymentID'))]",    
+    "osDiskName": "[concat(variables('vmName'), '-osdisk-', parameters('DeploymentID'))]",
+    "storageAccountName": "[toLower(concat(variables('vmName'), 'strg', parameters('DeploymentID')))]",
+    "containerName": "[toLower(concat(variables('vmName'), '-blobcontainer-', parameters('DeploymentID')))]",
     "location": "[resourceGroup().location]",
-    "containerName": "myblobcontainer"
+    "vmSize": "Standard_D2s_v3"
   },
   "resources": [
     {
@@ -72,7 +73,7 @@
     {
       "type": "Microsoft.Network/networkSecurityGroups",
       "apiVersion": "2022-07-01",
-      "name": "myNSG",
+      "name": "[variables('nsgName')]",
       "location": "[variables('location')]",
       "properties": {
         "securityRules": [
@@ -100,7 +101,7 @@
       "dependsOn": [
         "[resourceId('Microsoft.Network/publicIPAddresses', variables('ipName'))]",
         "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]",
-        "[resourceId('Microsoft.Network/networkSecurityGroups', 'myNSG')]"
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
       ],
       "properties": {
         "ipConfigurations": [
@@ -118,7 +119,7 @@
           }
         ],
         "networkSecurityGroup": {
-          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'myNSG')]"
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
         }
       }
     },
